@@ -6,6 +6,11 @@ This project is a motion detection and tracking system for the elderly, employin
 6431503132 Josef Mathieu Pattarapon Ranc
 6431503133 Nichaphat Srinongwaeng
 
+## Features
+### Motion Detection System
+*Developer* : Nichaphat Srinongwaeng
+*Description* : This branch focuses on development of the motion detection system using YOLOv8 pose estimation model for activity recognition such as standing, sleeping, sitting, and transitioning time between activities.
+
 ## Instruction
 You need to create skeleton of your project's development. It does not necessary include the complete source code. Please follow instructions below:
 - Edit readme file that briefly explains your project and details of members.​ 
