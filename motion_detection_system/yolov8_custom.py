@@ -2,4 +2,4 @@ from ultralytics import YOLO
 
 model = YOLO('yolov8m-pose.pt')
 
-results = model(source=0, show=True, conf=0.5, save=False)
+results = model(source=0, show=True, conf=0.5, stream=False)
