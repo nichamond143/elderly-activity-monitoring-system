@@ -13,3 +13,6 @@ logs/
 
 # Ignore any virtual environment directories
 venv/
+
+# Ignore directory containing security-related files
+keys/
