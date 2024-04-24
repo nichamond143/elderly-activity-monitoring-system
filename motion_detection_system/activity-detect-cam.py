@@ -7,6 +7,8 @@ from firebase_admin import firestore
 from ultralytics import YOLO
 import os
 from dotenv import load_dotenv
+from screeninfo import get_monitors
+import time
 
 load_dotenv()
 
@@ -19,7 +21,6 @@ def initialize_firestore(private_key):
     return firestore.client()
 
 def push_to_database(act_dict, db, doc_id):
-
     act_log = {
         'stand': act_dict["stand"]["duration"],
         'sit': act_dict["sit"]["duration"],
@@ -28,10 +29,10 @@ def push_to_database(act_dict, db, doc_id):
         'sit_to_stand': act_dict["sit_to_stand"]["duration"],
         'sit_to_sleep': act_dict["sit_to_sleep"]["duration"],
         'sleep_to_sit': act_dict["sleep_to_sit"]["duration"],
-        'date_time': firestore.SERVER_TIMESTAMP
+        'timestamp': firestore.SERVER_TIMESTAMP
     }
 
-    doc_ref = db.collection('patients').document(doc_id).collection('activityLogs').document()
+    doc_ref = db.collection('patients').document(doc_id).collection('activities').document()
     doc_ref.set(act_log)
 
     # Reset activity log
@@ -44,33 +45,32 @@ def push_to_database(act_dict, db, doc_id):
 
 def main():
 
-    video_path = "videos/stand-to-sit-1.mp4"
-
     # Firebase
     db = initialize_firestore(private_key)
 
     # Initialize YOLO Model
     model = YOLO('activity-model.pt')
 
-    cap = cv2.VideoCapture(video_path)
+    cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
 
-    frame_rate = cap.get(cv2.CAP_PROP_FPS)
-    frame_count = 0
-    elapsed_time = 0
-    frequency = 5
+    # screen_width, screen_height = get_monitors()[0].width, get_monitors()[0].height
+
+    frequency = 10
     track_hist = defaultdict(lambda: [])
     curr = None
+    start_time = None
+    last_push_time = None
 
     # Activity log dictionary
     act_dict = {
         "prev": None,
-        "stand": {"start_time": None, "duration": 0},
-        "sit": {"start_time": None, "duration": 0},
-        "sleep": {"start_time": None, "duration": 0},
-        "stand_to_sit": {"start_time": None, "duration": 0},
-        "sit_to_stand": {"start_time": None, "duration": 0},
-        "sit_to_sleep": {"start_time": None, "duration": 0},
-        "sleep_to_sit": {"start_time": None, "duration": 0},
+        "stand": {"start_time": 0, "duration": 0},
+        "sit": {"start_time": 0, "duration": 0},
+        "sleep": {"start_time": 0, "duration": 0},
+        "stand_to_sit": {"start_time": 0, "duration": 0},
+        "sit_to_stand": {"start_time": 0, "duration": 0},
+        "sit_to_sleep": {"start_time": 0, "duration": 0},
+        "sleep_to_sit": {"start_time": 0, "duration": 0},
     }
 
     # Activity classes map
@@ -81,27 +81,39 @@ def main():
     }
 
     while cap.isOpened():
+
+        # cap.set(3, screen_width)
+        # cap.set(4, screen_height)
+        cap.set(3, 720) # width
+        cap.set(4, 480) # height
+
         success, frame = cap.read()
 
         if not success:
             break
 
-        frame_count += 1
-        elapsed_time = frame_count / frame_rate
+        # frame = cv2.resize(frame, (screen_width, screen_height))
+
+        if (start_time is None and last_push_time is None):
+            start_time = time.time()
+            last_push_time = time.time()
+
+        elapsed_time = time.time() - start_time
 
         # Display information on frame
-        cv2.putText(frame, f"Time: {elapsed_time:.2f} s", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (255, 255, 255), 2)
-        cv2.putText(frame, f"Current Act: {curr}", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (255, 255, 255), 2)
+        cv2.putText(frame, f"Time: {elapsed_time:.2f} s", (10, 40), cv2.FONT_HERSHEY_SIMPLEX, 1.25, (255, 255, 255), 2)
+        cv2.putText(frame, f"Current Act: {curr}", (10, 80), cv2.FONT_HERSHEY_SIMPLEX, 1.25, (255, 255, 255), 2)
         i = 0
         for key, value in act_dict.items():
             if key != "prev":
-                cv2.putText(frame, f"{key}: {value['duration']} s", (10, 90 + (i * 30)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2)
+                cv2.putText(frame, f"{key}: {value['duration']} s", (10, 120 + (i * 35)), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 0), 2)
                 i += 1
 
-        # Pushed to database every frequency seconds
-        if frame_count % (frame_rate * frequency) == 0:
+        #Push to DB every freq secs
+        if time.time() - last_push_time >= frequency:
             print('PUSHED TO DATABASE...')
             push_to_database(act_dict, db, doc_id)
+            last_push_time = time.time()
 
         # Track object in frame
         results = model.track(frame, persist=True)
@@ -143,7 +155,7 @@ def main():
                     
                     # Update start time if activity just started
                     if act_dict[curr]["start_time"] is None:
-                        act_dict[curr]["start_time"] = round(elapsed_time,2)
+                        act_dict[curr]["start_time"] = round(time.time(),2)
                 
                 if len(track) > 30:
                     track.pop(0)
