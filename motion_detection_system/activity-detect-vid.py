@@ -1,13 +1,18 @@
-from collections import defaultdict
-import cv2
-import numpy as np
-import firebase_admin
-from firebase_admin import credentials
-from firebase_admin import firestore
-from ultralytics import YOLO
+import collections
 import os
+import time
+import logging
+
+import cv2
+import firebase_admin
+import numpy as np
 from dotenv import load_dotenv
+from firebase_admin import credentials, firestore
+from ultralytics import YOLO
 from screeninfo import get_monitors
+
+# Setup logging
+logging.basicConfig(level=logging.INFO)
 
 load_dotenv()
 
@@ -15,52 +20,80 @@ private_key = os.getenv('ELDERLY_KEY')
 doc_id = os.getenv('DOC_ID')
 
 def initialize_firestore(private_key):
-    cred = credentials.Certificate(private_key)
-    firebase_admin.initialize_app(cred)
-    return firestore.client()
+    if not private_key:
+        logging.error("Private key not found in environment variables.")
+        return None
+    try:
+        cred = credentials.Certificate(private_key)
+        firebase_admin.initialize_app(cred)
+        return firestore.client()
+    except Exception as e:
+        logging.error(f"Error initializing Firestore: {e}")
+        return None
 
 def push_to_database(act_dict, db, doc_id):
-    act_log = {
-        'stand': act_dict["stand"]["duration"],
-        'sit': act_dict["sit"]["duration"],
-        'sleep': act_dict["sleep"]["duration"],
-        'stand_to_sit': act_dict["stand_to_sit"]["duration"],
-        'sit_to_stand': act_dict["sit_to_stand"]["duration"],
-        'sit_to_sleep': act_dict["sit_to_sleep"]["duration"],
-        'sleep_to_sit': act_dict["sleep_to_sit"]["duration"],
-        'timestamp': firestore.SERVER_TIMESTAMP
-    }
+    if not db:
+        logging.error("Firestore database instance is None.")
+        return
 
-    doc_ref = db.collection('patients').document(doc_id).collection('activities').document()
-    doc_ref.set(act_log)
+    try:
+        act_log = {
+            'stand': act_dict["stand"]["duration"],
+            'sit': act_dict["sit"]["duration"],
+            'sleep': act_dict["sleep"]["duration"],
+            'stand_to_sit': act_dict["stand_to_sit"]["duration"],
+            'sit_to_stand': act_dict["sit_to_stand"]["duration"],
+            'sit_to_sleep': act_dict["sit_to_sleep"]["duration"],
+            'sleep_to_sit': act_dict["sleep_to_sit"]["duration"],
+            'timestamp': firestore.SERVER_TIMESTAMP
+        }
 
-    # Reset activity log
-    for key in act_dict:
-        if key != "prev":
-            act_dict[key]["start_time"] = None
-            act_dict[key]["duration"] = 0
+        doc_ref = db.collection('patients').document(doc_id).collection('activities').document()
+        doc_ref.set(act_log)
 
-    act_dict["prev"] = None
+        # Reset activity log
+        for key in act_dict:
+            if key != "prev":
+                act_dict[key]["start_time"] = None
+                act_dict[key]["duration"] = 0
+
+        act_dict["prev"] = None
+    except Exception as e:
+        logging.error(f"Error pushing to database: {e}")
 
 def main():
-
     video_path = "videos/demo-1.mp4"
-
+    
     # Firebase
     db = initialize_firestore(private_key)
+    if db is None:
+        logging.error("Exiting due to Firestore initialization failure.")
+        return
 
     # Initialize YOLO Model
-    model = YOLO('activity-model.pt')
+    try:
+        model = YOLO('activity-model.pt')
+    except Exception as e:
+        logging.error(f"Error loading YOLO model: {e}")
+        return
 
     cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+        logging.error(f"Error opening video file: {video_path}")
+        return
 
-    screen_width, screen_height = get_monitors()[0].width, get_monitors()[0].height
+    monitors = get_monitors()
+    if not monitors:
+        logging.error("No monitors found.")
+        return
+
+    screen_width, screen_height = monitors[0].width, monitors[0].height
 
     frame_rate = cap.get(cv2.CAP_PROP_FPS)
     frame_count = 0
     elapsed_time = 0
     frequency = 5
-    track_hist = defaultdict(lambda: [])
+    track_hist = collections.defaultdict(lambda: [])
     curr = None
 
     # Activity log dictionary
@@ -77,9 +110,9 @@ def main():
 
     # Activity classes map
     act_map = {
-    0: "stand",
-    1: "sleep",
-    2: "sit"
+        0: "stand",
+        1: "sleep",
+        2: "sit"
     }
 
     while cap.isOpened():
@@ -90,6 +123,7 @@ def main():
         success, frame = cap.read()
 
         if not success:
+            logging.info("End of video stream.")
             break
 
         frame = cv2.resize(frame, (screen_width, screen_height))
@@ -105,15 +139,19 @@ def main():
                 cv2.putText(frame, f"{key}: {value['duration']} s", (10, 120 + (i * 35)), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 0), 2)
                 i += 1
 
-        # Pushed to database every frequency seconds
+        #Pushed to database every frequency seconds
         if frame_count % (frame_rate * frequency) == 0:
-            print('PUSHED TO DATABASE...')
+            logging.info('PUSHED TO DATABASE...')
             push_to_database(act_dict, db, doc_id)
 
         # Track object in frame
-        results = model.track(frame, persist=True)
+        try:
+            results = model.track(frame, persist=True)
+        except Exception as e:
+            logging.error(f"Error tracking objects: {e}")
+            continue
 
-        if results[0].boxes.id is not None:
+        if results and results[0].boxes.id is not None:
             boxes = results[0].boxes.xywh.cpu()
             track_ids = results[0].boxes.id.int().cpu().tolist()
             activity = results[0].boxes.cls.cpu().numpy().astype(int)[0]
@@ -130,11 +168,14 @@ def main():
                     w_diff = track[-1][2] - track[-10][2]
                     h_diff = track[-1][3] - track[-10][3]
 
+                    cv2.putText(frame, f"x_diff: {x_diff:.2f}", (10, 370), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 0), 2)
+                    cv2.putText(frame, f"y_diff: {y_diff:.2f}", (10, 400), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 0), 2)
+
                     if abs(y_diff) > 10 or abs(h_diff) > 10 or abs(w_diff) > 10:
                         if h > w:
-                            if h_diff < -15:
+                            if h_diff < -15 and y_diff > 10:
                                 curr = "stand_to_sit"
-                            elif h_diff > 15:
+                            elif h_diff > 15 and y_diff < -10:
                                 curr = "sit_to_stand"
                             else:
                                 curr = act_map.get(activity)
@@ -150,7 +191,7 @@ def main():
                     
                     # Update start time if activity just started
                     if act_dict[curr]["start_time"] is None:
-                        act_dict[curr]["start_time"] = round(elapsed_time,2)
+                        act_dict[curr]["start_time"] = round(elapsed_time, 2)
                 
                 if len(track) > 30:
                     track.pop(0)
