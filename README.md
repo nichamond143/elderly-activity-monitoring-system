@@ -88,6 +88,7 @@ Make sure you have the following installed:
 - `opencv-python`
 - `firebase-admin`
 - `python-dotenv`
+- `screeninfo`
 - `numpy`
 - `ultralytics`
 
