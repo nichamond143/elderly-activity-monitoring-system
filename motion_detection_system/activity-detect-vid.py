@@ -14,61 +14,62 @@ from screeninfo import get_monitors
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 
-load_dotenv()
+#optional: push activity log to firebase by adding firebase private key and document id in .env file
+# load_dotenv()
 
-private_key = os.getenv('ELDERLY_KEY')
-doc_id = os.getenv('DOC_ID')
+# private_key = os.getenv('ELDERLY_KEY')
+# doc_id = os.getenv('DOC_ID')
 
-def initialize_firestore(private_key):
-    if not private_key:
-        logging.error("Private key not found in environment variables.")
-        return None
-    try:
-        cred = credentials.Certificate(private_key)
-        firebase_admin.initialize_app(cred)
-        return firestore.client()
-    except Exception as e:
-        logging.error(f"Error initializing Firestore: {e}")
-        return None
+# def initialize_firestore(private_key):
+#     if not private_key:
+#         logging.error("Private key not found in environment variables.")
+#         return None
+#     try:
+#         cred = credentials.Certificate(private_key)
+#         firebase_admin.initialize_app(cred)
+#         return firestore.client()
+#     except Exception as e:
+#         logging.error(f"Error initializing Firestore: {e}")
+#         return None
 
-def push_to_database(act_dict, db, doc_id):
-    if not db:
-        logging.error("Firestore database instance is None.")
-        return
+# def push_to_database(act_dict, db, doc_id):
+#     if not db:
+#         logging.error("Firestore database instance is None.")
+#         return
 
-    try:
-        act_log = {
-            'stand': act_dict["stand"]["duration"],
-            'sit': act_dict["sit"]["duration"],
-            'sleep': act_dict["sleep"]["duration"],
-            'stand_to_sit': act_dict["stand_to_sit"]["duration"],
-            'sit_to_stand': act_dict["sit_to_stand"]["duration"],
-            'sit_to_sleep': act_dict["sit_to_sleep"]["duration"],
-            'sleep_to_sit': act_dict["sleep_to_sit"]["duration"],
-            'timestamp': firestore.SERVER_TIMESTAMP
-        }
+#     try:
+#         act_log = {
+#             'stand': act_dict["stand"]["duration"],
+#             'sit': act_dict["sit"]["duration"],
+#             'sleep': act_dict["sleep"]["duration"],
+#             'stand_to_sit': act_dict["stand_to_sit"]["duration"],
+#             'sit_to_stand': act_dict["sit_to_stand"]["duration"],
+#             'sit_to_sleep': act_dict["sit_to_sleep"]["duration"],
+#             'sleep_to_sit': act_dict["sleep_to_sit"]["duration"],
+#             'timestamp': firestore.SERVER_TIMESTAMP
+#         }
 
-        doc_ref = db.collection('patients').document(doc_id).collection('activities').document()
-        doc_ref.set(act_log)
+#         doc_ref = db.collection('patients').document(doc_id).collection('activities').document()
+#         doc_ref.set(act_log)
 
-        # Reset activity log
-        for key in act_dict:
-            if key != "prev":
-                act_dict[key]["start_time"] = None
-                act_dict[key]["duration"] = 0
+#         # Reset activity log
+#         for key in act_dict:
+#             if key != "prev":
+#                 act_dict[key]["start_time"] = None
+#                 act_dict[key]["duration"] = 0
 
-        act_dict["prev"] = None
-    except Exception as e:
-        logging.error(f"Error pushing to database: {e}")
+#         act_dict["prev"] = None
+#     except Exception as e:
+#         logging.error(f"Error pushing to database: {e}")
 
 def main():
     video_path = "videos/demo-1.mp4"
     
     # Firebase
-    db = initialize_firestore(private_key)
-    if db is None:
-        logging.error("Exiting due to Firestore initialization failure.")
-        return
+    # db = initialize_firestore(private_key)
+    # if db is None:
+    #     logging.error("Exiting due to Firestore initialization failure.")
+    #     return
 
     # Initialize YOLO Model
     try:
@@ -140,9 +141,9 @@ def main():
                 i += 1
 
         #Pushed to database every frequency seconds
-        if frame_count % (frame_rate * frequency) == 0:
-            logging.info('PUSHED TO DATABASE...')
-            push_to_database(act_dict, db, doc_id)
+        # if frame_count % (frame_rate * frequency) == 0:
+        #     logging.info('PUSHED TO DATABASE...')
+        #     push_to_database(act_dict, db, doc_id)
 
         # Track object in frame
         try:

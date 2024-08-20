@@ -9,56 +9,56 @@ from dotenv import load_dotenv
 from firebase_admin import credentials, firestore
 from ultralytics import YOLO
 
-load_dotenv()
+#optional: push activity log to firebase by adding firebase private key and document id in .env file
+# load_dotenv()
+# private_key = os.getenv('KEY')
+# doc_id = os.getenv('DOC_ID')
 
-private_key = os.getenv('ELDERLY_KEY')
-doc_id = os.getenv('DOC_ID')
+# def initialize_firestore(private_key):
+#     try:
+#         cred = credentials.Certificate(private_key)
+#         firebase_admin.initialize_app(cred)
+#         return firestore.client()
+#     except Exception as e:
+#         print(f"Error initializing Firestore: {e}")
+#         return None
 
-def initialize_firestore(private_key):
-    try:
-        cred = credentials.Certificate(private_key)
-        firebase_admin.initialize_app(cred)
-        return firestore.client()
-    except Exception as e:
-        print(f"Error initializing Firestore: {e}")
-        return None
-
-def push_to_database(act_dict, db, doc_id):
-    if not db or not doc_id:
-        print("Database or Document ID is not initialized.")
-        return
+# def push_to_database(act_dict, db, doc_id):
+#     if not db or not doc_id:
+#         print("Database or Document ID is not initialized.")
+#         return
     
-    act_log = {
-        'stand': act_dict["stand"]["duration"],
-        'sit': act_dict["sit"]["duration"],
-        'sleep': act_dict["sleep"]["duration"],
-        'stand_to_sit': act_dict["stand_to_sit"]["duration"],
-        'sit_to_stand': act_dict["sit_to_stand"]["duration"],
-        'sit_to_sleep': act_dict["sit_to_sleep"]["duration"],
-        'sleep_to_sit': act_dict["sleep_to_sit"]["duration"],
-        'timestamp': firestore.SERVER_TIMESTAMP
-    }
+#     act_log = {
+#         'stand': act_dict["stand"]["duration"],
+#         'sit': act_dict["sit"]["duration"],
+#         'sleep': act_dict["sleep"]["duration"],
+#         'stand_to_sit': act_dict["stand_to_sit"]["duration"],
+#         'sit_to_stand': act_dict["sit_to_stand"]["duration"],
+#         'sit_to_sleep': act_dict["sit_to_sleep"]["duration"],
+#         'sleep_to_sit': act_dict["sleep_to_sit"]["duration"],
+#         'timestamp': firestore.SERVER_TIMESTAMP
+#     }
 
-    try:
-        doc_ref = db.collection('patients').document(doc_id).collection('activities').document()
-        doc_ref.set(act_log)
-    except Exception as e:
-        print(f"Error pushing to database: {e}")
-        return
+#     try:
+#         doc_ref = db.collection('patients').document(doc_id).collection('activities').document()
+#         doc_ref.set(act_log)
+#     except Exception as e:
+#         print(f"Error pushing to database: {e}")
+#         return
 
-    # Reset activity log
-    for key in act_dict:
-        if key != "prev":
-            act_dict[key]["start_time"] = 0
-            act_dict[key]["duration"] = 0
+#     # Reset activity log
+#     for key in act_dict:
+#         if key != "prev":
+#             act_dict[key]["start_time"] = 0
+#             act_dict[key]["duration"] = 0
 
-    act_dict["prev"] = None
+#     act_dict["prev"] = None
 
 def main():
-    db = initialize_firestore(private_key)
-    if not db:
-        print("Failed to initialize Firestore. Exiting.")
-        return
+    # db = initialize_firestore(private_key)
+    # if not db:
+    #     print("Failed to initialize Firestore. Exiting.")
+    #     return
 
     # Initialize YOLO Model
     try:
@@ -121,10 +121,10 @@ def main():
                     i += 1
 
             # Push to DB every frequency seconds
-            if time.time() - last_push_time >= frequency:
-                print('PUSHED TO DATABASE...')
-                push_to_database(act_dict, db, doc_id)
-                last_push_time = time.time()
+            # if time.time() - last_push_time >= frequency:
+            #     print('PUSHED TO DATABASE...')
+            #     push_to_database(act_dict, db, doc_id)
+            #     last_push_time = time.time()
 
             # Track object in frame
             results = model.track(frame, persist=True)
