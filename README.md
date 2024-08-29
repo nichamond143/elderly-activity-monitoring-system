@@ -5,6 +5,8 @@ This project is a activity detection and tracking system for the elderly, employ
 - **Activity Recognition**: Detects activities such as standing, sitting, and sleeping.
 - **Transition Tracking**: Monitors transitions between activities.
 - **Custom-Trained Model**: Utilizes a custom-trained computer vision model for accurate activity recognition (activity-model.pt)
+- **Memory Monitoring**: Logs and checks the current CPU and memory usage whether it exceeds a specified threshold (default 95%)
+- **Camera Availability**: Iterates through a list of camera to find the first available one
 - **Dataset Annotation**: Includes a program to annotate datasets according to YOLOv8 pose estimation dataset configuration (ex. activity-dataset.zip).
 - **Pose Estimation**: Simple program that uses pose estimation on images and videos.
 - **Web Camera Check**: Simple web camera check program.
@@ -36,7 +38,7 @@ Make sure you have the following installed:
 
 - Python 3.7 or higher
 - [pip](https://pip.pypa.io/en/stable/installation/)
-- [Firebase project](https://firebase.google.com/)
+- Optional: [Firebase project](https://firebase.google.com/)
 
 ## Installation
 
@@ -53,9 +55,9 @@ Make sure you have the following installed:
    pip install opencv-python firebase-admin python-dotenv numpy ultralytics
    ```
 
-3. **Set up your environment variables:**
+3. **Set up your environment variables (optional):**
 
-   Create a `.env` file in the project root directory with the following content:
+   Create a `.env` file in the project root directory with the following content and uncomment the Firebase code in the `activit-detection` files
 
    ```env
    ELDERLY_KEY=path/to/your/firebase/serviceAccountKey.json
@@ -69,22 +71,28 @@ Make sure you have the following installed:
    Execute the script using Python:
 
    ```bash
-   python file-name.py
+   python activity-detect-cam.py
    ```
 
 2. **Controls:**
 
    - The program will start your webcam and begin detecting and tracking activities.
-   - The program pushes activity logs to the Firestore database every 10 seconds (can edit by changing **frequency** variable).
+   - If you implement a Firebase datbase, the program will push activity logs to the database every 10 seconds (can edit by changing **frequency** variable).
    - Press `q` to quit the program.
 
 ## Notes
 
 - Ensure that your webcam is properly connected and functional.
-- The YOLO model  (`activity-model.pt`) may need fine-tuning for different environments or scenarios.
+- The YOLO model  (`activity-model.pt-v8x`) may need fine-tuning for different environments or scenarios.
 
 ## Dependencies
 
+- `collections`
+- `os`
+- `psutil`
+- `time`
+- `logging`
+- `dotenv`
 - `opencv-python`
 - `firebase-admin`
 - `python-dotenv`
@@ -96,9 +104,8 @@ Make sure you have the following installed:
 
 - If you encounter issues with Firebase initialization, ensure the `ELDERLY_KEY` path and `DOC_ID` in the `.env` file are correct.
 - For video capture issues, confirm that your webcam is accessible and not being used by other applications.
+- Make sure you'll imported the required dependencies.
 
-## License
 
-This project is licensed under the MIT License. See the `LICENSE` file for more details.
 
   

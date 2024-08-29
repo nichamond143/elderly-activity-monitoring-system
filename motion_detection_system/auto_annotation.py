@@ -3,18 +3,18 @@ import cv2
 import os
 
 #TODO: Define input and output directories
-dataset = "test"
-activity = "sleep"
+dataset = "train, val, or test"
+activity = "stand, sit, or sleep"
 
-#TODO: Define class index
-class_index = 1
+#TODO: Define class index from data.yaml
+class_index = 0
 
-raw_dataset = f'{dataset}-{activity}-dataset'
-output_image_folder = f'activity-dataset/{dataset}/images'
-output_txt_folder = f'activity-dataset/{dataset}/labels'
+raw_dataset = f'{activity}-dataset/{dataset}'
+output_image_folder = f'exercise-dataset/{dataset}/images'
+output_txt_folder = f'exercise-dataset/{dataset}/labels'
 
 # Initialize the YOLO model
-model = YOLO('yolov8m-pose.pt')
+model = YOLO('yolo-Weights/yolov8m-pose.pt')
 
 # Iterate through images in the input folder
 for filename in os.listdir(raw_dataset):
