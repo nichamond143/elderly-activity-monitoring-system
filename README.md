@@ -2,7 +2,7 @@
 This project is a activity detection and tracking system for the elderly, employing a custom trained computer vision model and transition algorithm. It utilizes web camera footage processed by Ultralytics YOLOv8 for object detection and tracking. The system trains a custom model using pose estimation for activity recognition, with results stored in a Firebase database, accessible via a Flutter web app developed in Flutterflow.
 
 ## Features
-- **Activity Recognition**: Detects activities such as standing, sitting, and sleeping.
+- **Activity Recognition**: Detects activities such as standing, sitting, and sleeping. Link to Google Colab: [YOLOv8 Custom Pose Estimation](https://colab.research.google.com/drive/1KIdEeraimaSSi6q0DvRHfmBwo2SIXseF?usp=sharing)
 - **Transition Tracking**: Monitors transitions between activities.
 - **Custom-Trained Model**: Utilizes a custom-trained computer vision model for accurate activity recognition (activity-model.pt)
 - **Memory Monitoring**: Logs and checks the current CPU and memory usage whether it exceeds a specified threshold (default 95%)
@@ -13,7 +13,7 @@ This project is a activity detection and tracking system for the elderly, employ
 
 ## Activity Detection Examples
 
-<div style="display: flex; justify-content: space-evenly;">
+<div style="display: flex; flex-direction: row; justify-content: space-evenly">
 
   <div style="text-align: center;">
     <img src="examples/stand-example.png" alt="Stand detection" style="width: 200px;">
