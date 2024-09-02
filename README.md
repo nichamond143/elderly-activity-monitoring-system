@@ -16,24 +16,13 @@ This project is a activity detection and tracking system for the elderly, employ
 ## Activity Detection Examples
 See more evaluation results in the `runs` folder or the [YOLOv8 Custom Pose Estimation](https://colab.research.google.com/drive/1KIdEeraimaSSi6q0DvRHfmBwo2SIXseF?usp=sharing)
 
-<div style="display: flex; flex-direction: row; justify-content: space-evenly">
-
-  <div style="text-align: center;">
-    <img src="examples/stand-example.png" alt="Stand detection" style="width: 200px;">
-    <p><strong>Standing Detection</strong></p>
-  </div>
-
-  <div style="text-align: center;">
-    <img src="examples/sit-example.png" alt="Sit detection" style="width: 200px;">
-    <p><strong>Sitting Detection</strong></p>
-  </div>
-
-  <div style="text-align: center;">
-    <img src="examples/sleep-example.png" alt="Sleep detection" style="width: 200px;">
-    <p><strong>Sleeping Detection</strong></p>
-  </div>
-
-</div>
+<table>
+  <tr>
+    <td><img src="examples/stand-example.png" alt="standing" style="height: 200px;"></td>
+    <td><img src="examples/sit-example.png" alt="sitting" style="height: 200px;"></td>
+    <td><img src="examples/sleep-example.png" alt="sleeping" style="height: 200px;"></td>
+  </tr>
+</table>
 
 ## Prerequisites
 
