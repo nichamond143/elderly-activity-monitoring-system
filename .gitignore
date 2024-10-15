@@ -1,4 +1,6 @@
-# Ignore local env files
+# Virtual environment
+venv/
+env/
+
+# Environment variables
 .env
-.env.local
-.env.*.local
