@@ -1,27 +1,30 @@
 import collections
 import os
-import time
 import psutil
 import logging
+import smtplib
+import time 
 
 import cv2
 import firebase_admin
-import numpy as np
 from dotenv import load_dotenv
-from firebase_admin import credentials, firestore
+from firebase_admin import credentials, firestore, messaging
 from ultralytics import YOLO
 from screeninfo import get_monitors
 
 # Setup logging
-logging.basicConfig(
-    level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s"
-)
+logging.basicConfig(level=logging.INFO)
 
-# optional: push activity log to firebase by adding firebase private key and document id in .env file
-# load_dotenv()
+load_dotenv()
 
-# private_key = os.getenv('ELDERLY_KEY')
-# doc_id = os.getenv('DOC_ID')
+#NOTE: OPTIONAL PUSH TO FIREBASE FIRESTORE
+
+# private_key = os.getenv("ELDERLY_KEY")
+# doc_id = os.getenv("DOC_ID")
+# email = os.getenv("APP_EMAIL")
+# receiver_email = os.getenv("ADMIN_EMAIL")
+# app_password = os.getenv("APP_PASSWORD")
+
 
 # def initialize_firestore(private_key):
 #     if not private_key:
@@ -35,24 +38,30 @@ logging.basicConfig(
 #         logging.error(f"Error initializing Firestore: {e}")
 #         return None
 
-# def push_to_database(act_dict, db, doc_id):
+
+# def push_act_log(act_dict, db, doc_id):
 #     if not db:
 #         logging.error("Firestore database instance is None.")
 #         return
 
 #     try:
 #         act_log = {
-#             'stand': act_dict["stand"]["duration"],
-#             'sit': act_dict["sit"]["duration"],
-#             'sleep': act_dict["sleep"]["duration"],
-#             'stand_to_sit': act_dict["stand_to_sit"]["duration"],
-#             'sit_to_stand': act_dict["sit_to_stand"]["duration"],
-#             'sit_to_sleep': act_dict["sit_to_sleep"]["duration"],
-#             'sleep_to_sit': act_dict["sleep_to_sit"]["duration"],
-#             'timestamp': firestore.SERVER_TIMESTAMP
+#             "stand": act_dict["stand"]["duration"],
+#             "sit": act_dict["sit"]["duration"],
+#             "sleep": act_dict["sleep"]["duration"],
+#             "stand_to_sit": act_dict["stand_to_sit"]["duration"],
+#             "sit_to_stand": act_dict["sit_to_stand"]["duration"],
+#             "sit_to_sleep": act_dict["sit_to_sleep"]["duration"],
+#             "sleep_to_sit": act_dict["sleep_to_sit"]["duration"],
+#             "timestamp": firestore.SERVER_TIMESTAMP,
 #         }
 
-#         doc_ref = db.collection('patients').document(doc_id).collection('activities').document()
+#         doc_ref = (
+#             db.collection("patients")
+#             .document(doc_id)
+#             .collection("activities")
+#             .document()
+#         )
 #         doc_ref.set(act_log)
 
 #         # Reset activity log
@@ -65,17 +74,57 @@ logging.basicConfig(
 #     except Exception as e:
 #         logging.error(f"Error pushing to database: {e}")
 
+#NOTE: OPTIONAL notifiy admin by email
+# def notify_admin(type):
 
-def monitor_memory(threshold=95):
-    memory_info = psutil.virtual_memory()
-    memory_usage = memory_info.percent
-    cpu_usage = psutil.cpu_percent()
-    logging.info(f"CPU Useage: {cpu_usage}%")
-    logging.info(f"Memory Useage: {memory_usage}%")
-    return memory_usage > threshold or cpu_usage > threshold
+#     # Define alert templates
+#     logging.info("Notifying Admin...")
+#     alerts = {
+#         0: {
+#             "type": "System Alert",
+#             "title": "Camera Connection Issue",
+#             "text": "The camera is disconnected or in use by another application. Video feed interrupted."
+#         },
+#         1: {
+#             "type": "System Alert",
+#             "title": "Camera Connection Issue",
+#             "text": "Camera feed lost. Attempting to switch to backup camera."
+#         },
+#         2: {
+#             "type": "System Warning",
+#             "title": "High Resource Usage",
+#             "text": "High resource usage detected. Restarting activity recognition program to avoid performance issues or system crashes."
+#         },
+#         3: {
+#             "type": "Unknown",
+#             "title": "Unknown Issue",
+#             "text": "Contact Admin"
+#         }
+#     }
 
+#     alert = alerts.get(type, alerts[3])
+    
+#     alert.update({
+#         "patientID": doc_id,
+#     })
+
+#     subject = f"{alert['type']} Test"
+#     message = f"{alert['title']}: {alert['text']} \nID: {alert['patientID']}"
+#     text = f"Subject:{subject}\n\n{message}"
+
+#     try:
+#         logging.info("Sending email...")
+#         server = smtplib.SMTP("smtp.gmail.com", 587)
+#         server.starttls()
+        
+#         server.login(email, app_password)
+#         server.sendmail(email, receiver_email, text)
+#         logging.info("Email sent to Admin")
+#     except Exception as e:
+#         logging.error(f"Error pushing to alert: {e}")
 
 def main():
+        
     video_path = "videos/demo-1.mp4"
 
     # Firebase
@@ -86,7 +135,7 @@ def main():
 
     # Initialize YOLO Model
     try:
-        model = YOLO("yolo-Weights/activity-model-v8n.pt")
+        model = YOLO("yolo-Weights/activity-model-v8m.pt")
     except Exception as e:
         logging.error(f"Error loading YOLO model: {e}")
         return
@@ -102,12 +151,14 @@ def main():
         return
 
     screen_width, screen_height = monitors[0].width, monitors[0].height
-    frame_rate = cap.get(cv2.CAP_PROP_FPS)
-    frame_count = 0
-    elapsed_time = 0
-    frequency = 5
-    track_hist = collections.defaultdict(lambda: [])
-    curr = None
+    frame_rate, frame_count, elapsed_time = cap.get(cv2.CAP_PROP_FPS), 0, 0
+    
+    #TODO: Set variables
+    frequency, CPU_THRESH, DUR_THRESH = 5, 80.0, 600.0
+
+    track_hist = collections.defaultdict(list)
+    curr, cpu, high_usage_start, high_usage_dur = None, None, None, None
+
 
     # Activity classes map
     act_map = {0: "stand", 1: "sleep", 2: "sit"}
@@ -151,11 +202,6 @@ def main():
             2,
         )
 
-        # Optional: Pushed to database every frequency seconds
-        # if frame_count % (frame_rate * frequency) == 0:
-        #     logging.info('PUSHED TO DATABASE...')
-        #     push_to_database(act_dict, db, doc_id)
-
         # Track object in frame
         try:
             results = model.track(frame, persist=True)
@@ -174,31 +220,11 @@ def main():
                 track.append((float(x), float(y), float(w), float(h)))
 
                 # Determine current activity
-                # Note: Takes 10 frames to calibrate
                 if len(track) >= 10:
                     x_diff = track[-1][0] - track[-10][0]
                     y_diff = track[-1][1] - track[-10][1]
                     w_diff = track[-1][2] - track[-10][2]
                     h_diff = track[-1][3] - track[-10][3]
-
-                    cv2.putText(
-                        frame,
-                        f"x_diff: {x_diff:.2f}",
-                        (10, 370),
-                        cv2.FONT_HERSHEY_SIMPLEX,
-                        1.0,
-                        (0, 0, 0),
-                        2,
-                    )
-                    cv2.putText(
-                        frame,
-                        f"y_diff: {y_diff:.2f}",
-                        (10, 400),
-                        cv2.FONT_HERSHEY_SIMPLEX,
-                        1.0,
-                        (0, 0, 0),
-                        2,
-                    )
 
                     if abs(y_diff) > 10 or abs(h_diff) > 10 or abs(w_diff) > 10:
                         if h > w:
@@ -221,6 +247,11 @@ def main():
                     # Update start time if activity just started
                     if act_dict[curr]["start_time"] is None:
                         act_dict[curr]["start_time"] = round(elapsed_time, 2)
+
+                    # Pushed to database every frequency seconds
+                    # if frame_count % (frame_rate * frequency) == 0:
+                    #     logging.info("PUSHED TO DATABASE...")
+                    #     push_to_database(act_dict, db, doc_id)
 
                     cv2.putText(
                         frame,
@@ -245,7 +276,7 @@ def main():
                                 2,
                             )
                             i += 1
-                    
+
                     cv2.putText(
                         frame,
                         f"x_diff: {x_diff:.2f}",
@@ -264,7 +295,7 @@ def main():
                         (0, 0, 0),
                         2,
                     )
-                
+
                 else:
                     cv2.putText(
                         frame,
@@ -291,11 +322,22 @@ def main():
 
         act_dict["prev"] = curr
 
+        #CPU Monitoring
+        cpu = psutil.cpu_percent()
+        logging.info(f"cpu percentage: {cpu}")
+        if cpu > CPU_THRESH:
+            if high_usage_start is None:
+                high_usage_start = time.time()
+            
+            high_usage_dur = time.time() - high_usage_start
+            
+            if high_usage_dur > DUR_THRESH:
+                logging.critical("High memory usage for prolonged duration detected!")
+                # notify_admin(type=2)
+                break
+
         annotated_frame = results[0].plot()
         cv2.imshow("YOLOv8 Tracking", annotated_frame)
-
-        if monitor_memory():
-            logging.critical("High memory usage detected!")
 
         if cv2.waitKey(1) & 0xFF == ord("q"):
             break
