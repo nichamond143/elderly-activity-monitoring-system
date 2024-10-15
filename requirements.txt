@@ -1,0 +1,7 @@
+psutil
+opencv-python
+firebase-admin
+python-dotenv
+screeninfo
+numpy
+ultralytics
