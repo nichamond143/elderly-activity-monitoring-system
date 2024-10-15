@@ -45,16 +45,19 @@ Make sure you have the following installed:
 2. **Install dependencies:**
 
    ```bash
-   pip install opencv-python firebase-admin python-dotenv numpy ultralytics
+   pip install -r requirements.txt
    ```
 
 3. **Set up your environment variables (optional):**
 
-   Create a `.env` file in the project root directory with the following content and uncomment the Firebase code in the `activit-detection` files
+   Create a `.env` file in the project root directory with the following content and uncomment the Firebase code in the `activity-detection` files
 
    ```env
    ELDERLY_KEY=path/to/your/firebase/serviceAccountKey.json
    DOC_ID=your_document_id
+   APP_EMAIL="googleapp@email.com"
+   ADMIN_EMAIL="admin@email.com"
+   APP_PASSWORD="google_app_password"
    ```
 
 ## Usage
@@ -80,11 +83,7 @@ Make sure you have the following installed:
 
 ## Dependencies
 
-- `collections`
-- `os`
 - `psutil`
-- `time`
-- `logging`
 - `dotenv`
 - `opencv-python`
 - `firebase-admin`
@@ -95,9 +94,9 @@ Make sure you have the following installed:
 
 ## Troubleshooting
 
-- If you encounter issues with Firebase initialization, ensure the `ELDERLY_KEY` path and `DOC_ID` in the `.env` file are correct.
+- If you encounter issues with Firebase initialization, ensure the variable paths in the `.env` file are correct.
 - For video capture issues, confirm that your webcam is accessible and not being used by other applications.
-- Make sure you'll imported the required dependencies.
+- Make sure you'll imported the required dependencies from requirements.txt
 
 
 
