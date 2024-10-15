@@ -3,7 +3,7 @@ import cv2
 import os
 
 # Load the image
-image_path = "path-to-image"
+image_path = "examples/test.png"
 frame = cv2.imread(image_path)
 
 # Resize the frame to the desired width and height
@@ -47,7 +47,7 @@ save_dir = "labeled"
 os.makedirs(save_dir, exist_ok=True)  # Create the folder if it doesn't exist
 
 # Save the annotated frame image
-cv2.imwrite(os.path.join(save_dir, "kp-เก็บคาง-2.jpg"), frame)
+cv2.imwrite(os.path.join(save_dir, "kp-test-1.jpg"), frame)
 
 # Display the frame
 cv2.imshow('Frame', frame)

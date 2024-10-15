@@ -3,6 +3,7 @@ import os
 import psutil
 import time
 import logging
+import smtplib
 
 import cv2
 import firebase_admin
@@ -16,10 +17,13 @@ logging.basicConfig(
     level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s"
 )
 
-# optional: push activity log to firebase by adding firebase private key and document id in .env file
+# NOTE: OPTIONAL push activity log to firebase by adding firebase private key and document id in .env file
 # load_dotenv()
 # private_key = os.getenv('KEY')
 # doc_id = os.getenv('DOC_ID')
+# email = os.getenv("APP_EMAIL")
+# receiver_email = os.getenv("ADMIN_EMAIL")
+# app_password = os.getenv("APP_PASSWORD")
 
 # def initialize_firestore(private_key):
 #     try:
@@ -61,15 +65,54 @@ logging.basicConfig(
 
 #     act_dict["prev"] = None
 
+# NOTE: OPTIONAL admin email notification
+# def notify_admin(type):
 
-def monitor_memory(threshold=95):
-    memory_info = psutil.virtual_memory()
-    memory_usage = memory_info.percent
-    cpu_usage = psutil.cpu_percent()
-    logging.info(f"CPU Useage: {cpu_usage}%")
-    logging.info(f"Memory Useage: {memory_usage}%")
-    return memory_usage > threshold or cpu_usage > threshold
+#     # Define alert templates
+#     logging.info("Notifying Admin...")
+#     alerts = {
+#         0: {
+#             "type": "System Alert",
+#             "title": "Camera Connection Issue",
+#             "text": "The camera is disconnected or in use by another application. Video feed interrupted."
+#         },
+#         1: {
+#             "type": "System Alert",
+#             "title": "Camera Connection Issue",
+#             "text": "Camera feed lost. Attempting to switch to backup camera."
+#         },
+#         2: {
+#             "type": "System Warning",
+#             "title": "High Resource Usage",
+#             "text": "High resource usage detected. Restarting activity recognition program to avoid performance issues or system crashes."
+#         },
+#         3: {
+#             "type": "Unknown",
+#             "title": "Unknown Issue",
+#             "text": "Contact Admin"
+#         }
+#     }
 
+#     alert = alerts.get(type, alerts[3])
+    
+#     alert.update({
+#         "patientID": doc_id,
+#     })
+
+#     subject = f"{alert['type']} Test"
+#     message = f"{alert['title']}: {alert['text']} \nID: {alert['patientID']}"
+#     text = f"Subject:{subject}\n\n{message}"
+
+#     try:
+#         logging.info("Sending email...")
+#         server = smtplib.SMTP("smtp.gmail.com", 587)
+#         server.starttls()
+        
+#         server.login(email, app_password)
+#         server.sendmail(email, receiver_email, text)
+#         logging.info("Email sent to Admin")
+#     except Exception as e:
+#         logging.error(f"Error pushing to alert: {e}")
 
 def check_camera(camera_index):
     cap = cv2.VideoCapture(camera_index)
@@ -87,22 +130,20 @@ def find_camera(camera_indices):
             return cv2.VideoCapture(index)
     return None
 
-
 def main():
+    # Initialize Firebase Firestore DB
     # db = initialize_firestore(private_key)
     # if not db:
-    #     print("Failed to initialize Firestore. Exiting.")
+    #     logging.error("Failed to initialize Firestore. Exiting...")
     #     return
 
     # Initialize YOLO Model
     try:
-        #TODO: Choose an activity model
-        model = YOLO("yolo-Weights/activity-model-v8n.pt")
+        model = YOLO("yolo-Weights/activity-model-v8m.pt")
     except Exception as e:
-        print(f"Error loading YOLO model: {e}")
+        logging.error(f"Error loading YOLO model: {e}")
         return
 
-    # TODO: List available cameras
     camera_indices = [0]
     cap = None
 
@@ -110,20 +151,20 @@ def main():
         cap = find_camera(camera_indices)
 
         if cap is None:
+            # TODO: Notify
             logging.error("No camera available. Exiting...")
+            # notify_admin(type=0)
             return
 
         cap.set(3, 640)  # width
         cap.set(4, 480)  # height
 
-        frequency = 5  # Push to DB frequency
-        detection_timeout = 10  # Timeout for switching cameras
-        MAX_TRACK_HISTORY = 30
-        start_time = time.time()
-        last_detection_time = time.time()
-        last_push_time = time.time()
-        curr = None
-        track_hist = collections.defaultdict(lambda: [])
+        track_hist = collections.defaultdict(list)
+        frequency, MAX_TRACK_HISTORY = 5, 30
+        start_time = last_detection_time = last_push_time = time.time()
+        curr, cpu, high_usage_start, high_usage_dur = None, None, None, None
+        CPU_THRESH, DUR_THRESH, DETECTION_TIMEOUT = 80.0, 600.0, 300.0
+
 
         # Activity classes map
         act_map = {0: "stand", 1: "sleep", 2: "sit"}
@@ -147,13 +188,14 @@ def main():
             if not success:
                 # TODO: Notify
                 logging.warning("Camera feed lost, attempting to switch to backup...")
+                # notify_admin(type=1)
                 cap.release()
                 cap = find_camera(camera_indices)
                 if cap is None:
                     # TODO: Notify
                     logging.error("No camera available. Exiting...")
+                    # notify_admin(type=0)
                     break
-                continue
 
             elapsed_time = time.time() - start_time
 
@@ -183,7 +225,6 @@ def main():
                     track.append((float(x), float(y), float(w), float(h)))
 
                     # Determine current activity
-                    # Note: Takes 10 frames to calibrate
                     if len(track) >= 10:
                         x_diff = track[-1][0] - track[-10][0]
                         y_diff = track[-1][1] - track[-10][1]
@@ -212,12 +253,12 @@ def main():
                         if act_dict[curr]["start_time"] == 0:
                             act_dict[curr]["start_time"] = round(elapsed_time, 2)
 
-                        # Optional: Push to DB every frequency seconds
+                        # Push to DB every frequency seconds
                         # if time.time() - last_push_time >= frequency:
                         #     print('PUSHED TO DATABASE...')
                         #     push_to_database(act_dict, db, doc_id)
                         #     last_push_time = time.time()
-                        
+
                         cv2.putText(
                             frame,
                             f"Current Act: {curr}",
@@ -227,7 +268,6 @@ def main():
                             (255, 255, 255),
                             2,
                         )
-
                         i = 0
                         for key, value in act_dict.items():
                             if key != "prev":
@@ -241,45 +281,34 @@ def main():
                                     2,
                                 )
                                 i += 1
-                    
-                    else: 
+
+                    else:
                         cv2.putText(
-                        frame,
-                        f"Calibrating...",
-                        (10, 80),
-                        cv2.FONT_HERSHEY_SIMPLEX,
-                        1.25,
-                        (255, 255, 255),
-                        2,
-                    )
+                            frame,
+                            f"Calibrating...",
+                            (10, 80),
+                            cv2.FONT_HERSHEY_SIMPLEX,
+                            1.25,
+                            (255, 255, 255),
+                            2,
+                        )
 
                     if len(track) > MAX_TRACK_HISTORY:
                         track.pop(0)
 
-                    # Draw trajectory on frame
-                    x_values = [coord[0] for coord in track]
-                    y_values = [coord[1] for coord in track]
-                    combined_points = [(x, y) for x, y in zip(x_values, y_values)]
-                    points = np.array(combined_points, np.int32).reshape((-1, 1, 2))
-                    cv2.polylines(
-                        frame,
-                        [points],
-                        isClosed=False,
-                        color=(230, 230, 230),
-                        thickness=10,
-                    )
-
             else:
                 # Camera obstruction / No person in view
                 # TODO: Notify
-                if time.time() - last_detection_time > detection_timeout:
+                if time.time() - last_detection_time > DETECTION_TIMEOUT:
                     logging.warning(
                         "No detection for a while, attempting to switch to backup camera..."
                     )
+                    # notify_admin(type=1)
                     cap.release()
                     cap = find_camera(camera_indices)
                     if cap is None:
                         logging.error("No camera available. Exiting...")
+                        # notify_admin(type=0)
                         break
                     last_detection_time = time.time()
 
@@ -294,19 +323,29 @@ def main():
                 )
 
             act_dict["prev"] = curr
+            
+            #CPU Monitoring
+            cpu = psutil.cpu_percent()
+            logging.info(f"cpu percentage: {cpu}")
+            if cpu > CPU_THRESH:
+                if high_usage_start is None:
+                    high_usage_start = time.time()
+                
+                high_usage_dur = time.time() - high_usage_start
+                
+                if high_usage_dur > DUR_THRESH:
+                    logging.critical("High memory usage for prolonged duration detected!")
+                    # notify_admin(type=2)
+                    break
 
             annotated_frame = results[0].plot()
             cv2.imshow("YOLOv8 Tracking", annotated_frame)
-
-            if monitor_memory():
-                # TODO: Notify
-                logging.critical("High memory usage detected!")
 
             if cv2.waitKey(1) & 0xFF == ord("q"):
                 break
 
     except Exception as e:
-        print(f"Error during video processing: {e}")
+        logging.error(f"Error during video processing: {e}")
     finally:
         if cap is not None:
             cap.release()

@@ -4,11 +4,12 @@ This project is a activity detection and tracking system for the elderly, employ
 ## Features
 - **Activity Recognition**: Detects activities such as standing, sitting, and sleeping.
   - Pose mAP50 is 0.926, with high accuracy for standing (0.995), sitting (0.942), and moderate for sleeping (0.841).
-  - Link to Google Colab: [YOLOv8 Custom Pose Estimation](https://colab.research.google.com/drive/1KIdEeraimaSSi6q0DvRHfmBwo2SIXseF?usp=sharing)
+  - Link to Google Colab for Model Training: [YOLOv8 Custom Pose Estimation](https://colab.research.google.com/drive/1KIdEeraimaSSi6q0DvRHfmBwo2SIXseF?usp=sharing)
 - **Transition Tracking**: Monitors transitions between activities.
 - **Custom-Trained Model**: Utilizes a custom-trained computer vision model for accurate activity recognition (activity-model.pt)
-- **Memory Monitoring**: Logs and checks the current CPU and memory usage whether it exceeds a specified threshold (default 95%)
+- **Memory Monitoring**: Logs and checks the current CPU usage whether it exceeds a specified threshold (default 80% for 10min)
 - **Camera Availability**: Iterates through a list of camera to find the first available one
+- **Notifies Admin by Email**: Notifies admin by camera is unavailable or memory usage is high
 - **Dataset Annotation**: Includes a program to annotate datasets according to YOLOv8 pose estimation dataset configuration (ex. activity-dataset.zip).
 - **Pose Estimation**: Simple program that uses pose estimation on images and videos.
 - **Web Camera Check**: Simple web camera check program.
